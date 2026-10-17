@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>动脉血压调节 · 预测式虚拟仿真实验</title>
+<style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #101b2c; color: #eaf2ff; font-family: Arial, 'Microsoft YaHei', sans-serif; }
+    header { padding: 14px 26px; background: #193457; font-size: 21px; font-weight: bold; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    header small { font-size: 12px; font-weight: normal; color: #aec9e6; margin-left: auto; }
+    .progress-bar { height: 6px; background: #0e1a29; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3786e5, #50e2a0); transition: width .4s; }
+    .wrap { display: grid; grid-template-columns: 1fr 1.5fr; gap: 16px; padding: 16px; }
+    .panel { background: #20314a; border: 1px solid #425773; border-radius: 14px; padding: 16px; }
+    h2 { font-size: 17px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+
+    .stage {
+        position: relative;
+        min-height: 350px;
+        background: linear-gradient(#2c3e55, #16283c);
+        border-radius: 12px;
+        padding: 12px 10px 10px;
+        overflow: visible;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .vial-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 2; }
+    .vial { width: 64px; height: 96px; border: 3px solid #aab9cc; border-radius: 10px 10px 14px 14px; background: linear-gradient(90deg, #a6c7e9aa, #f4faffdd, #a6c7e9aa); position: relative; color: #14243c; text-align: center; font-weight: bold; font-size: 10px; display: flex; align-items: center; justify-content: center; line-height: 1.25; padding: 3px; }
+    .vial:before { content: ''; position: absolute; top: -13px; width: 40px; height: 13px; border-radius: 4px 4px 0 0; background: #cb444c; }
+    .vial.ach:before { background: #2f9e6b; }
+    .vial.na:before { background: #d98c2e; }
+    .vial.ne:before { background: #9b59b6; }
+    .vial.saline:before { background: #7a9cbf; }
+    .vial-label { font-size: 11px; color: #aec2da; text-align: center; margin-top: 3px; }
+
+    .table-wrap { position: relative; display: flex; justify-content: center; margin-top: 4px; z-index: 1; }
+    .rabbit-svg { width: 360px; height: 200px; display: block; }
+
+    .vein-point, .vial-point {
+        position: absolute; width: 12px; height: 12px;
+        border-radius: 50%; opacity: 0; transition: opacity .2s;
+        z-index: 6; pointer-events: none;
+    }
+    .vial-point { background: #ffd166; box-shadow: 0 0 10px #ffd166; }
+    .vein-point { background: #ff6b6b; box-shadow: 0 0 10px #ff6b6b; }
+    .vein-point.show, .vial-point.show { opacity: 1; }
+
+    .syringe {
+        position: absolute; width: 118px; height: 24px;
+        border: 2.5px solid #c9d9ee; border-radius: 5px;
+        background: linear-gradient(180deg, #f4fbff, #b7d6f0);
+        z-index: 10; opacity: 0; pointer-events: none;
+        transform-origin: 0 50%;
+    }
+    .syringe .needle {
+        position: absolute; left: -46px; top: 8px;
+        width: 46px; height: 4px;
+        background: linear-gradient(90deg, #dfe9f3, #9fb4c8);
+        border-radius: 2px 0 0 2px;
+    }
+    .syringe .needle:after {
+        content: ''; position: absolute; left: -8px; top: -1px;
+        width: 10px; height: 6px; background: #f0f6fc;
+        clip-path: polygon(0 50%, 100% 0, 100% 100%);
+    }
+    .syringe .plunger {
+        position: absolute; left: 4px; top: 3px;
+        width: 16px; height: 14px; background: #4a90d9; border-radius: 2px;
+    }
+    .syringe .plunger:after {
+        content: ''; position: absolute; right: -10px; top: 5px;
+        width: 8px; height: 4px; background: #4a90d9;
+    }
+    .syringe .liquid {
+        position: absolute; left: 20px; top: 4px;
+        height: 12px; width: 0px;
+        background: linear-gradient(180deg, #d6f9e8, #7ae0b0);
+        border-radius: 2px;
+    }
+
+    .muted { color: #aec2da; font-size: 12px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+    button { border: 0; border-radius: 8px; padding: 10px 14px; background: #3786e5; color: white; font-size: 13px; cursor: pointer; transition: background .15s; font-weight: 500; }
+    button:hover:not(:disabled) { background: #4e9af0; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.secondary { background: #546780; }
+    button.secondary:hover:not(:disabled) { background: #647a96; }
+    button.success { background: #2f9e6b; }
+    button.success:hover:not(:disabled) { background: #3bb37c; }
+    select { padding: 9px 8px; border-radius: 7px; background: #e7f0ff; color: #182b43; font-size: 13px; border: 1px solid #9bb7d9; font-weight: 500; min-width: 150px; }
+    input[type=number] { padding: 8px; border-radius: 6px; background: #0e1e33; color: #eaf2ff; border: 1px solid #425773; width: 68px; font-size: 14px; text-align: center; }
+    input[type=number]:focus { outline: none; border-color: #50e2a0; }
+    input[type=number]:disabled { opacity: .55; }
+    .predict-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; background: #142a42; border-radius: 10px; padding: 12px; margin-top: 12px; }
+    .predict-row .field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #aec2da; }
+    canvas#plot { width: 100%; height: 300px; background: #071423; border-radius: 10px; display: block; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+    .metric { background: #13263c; padding: 10px 6px; border-radius: 9px; text-align: center; font-size: 11px; }
+    .metric strong { display: block; font-size: 22px; color: #70d3fc; margin-top: 3px; line-height: 1.2; }
+    .metric.hr strong { color: #ffb074; }
+    .log { font-size: 12px; line-height: 1.75; max-height: 130px; overflow-y: auto; padding-right: 4px; }
+    .log div { border-bottom: 1px dashed #2f4460; padding: 2px 0; }
+    .log div.judge-ok { color: #7ae0b0; }
+    .log div.judge-bad { color: #ffa07a; }
+    .foot { padding: 0 20px 16px; color: #aebed0; font-size: 11px; }
+    .status-badge { background: #1a2f46; border-radius: 20px; padding: 5px 14px; font-size: 12px; display: inline-block; }
+    .done-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .done-chip { font-size: 11px; padding: 3px 9px; border-radius: 11px; background: #1c3a58; border: 1px solid #2e577e; color: #8fb8dd; }
+    .done-chip.done { background: #1e4a38; border-color: #2f9e6b; color: #7ae0b0; }
+    .modal-overlay { position: fixed; inset: 0; background: #000a; display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px; }
+    .modal-overlay.show { display: flex; }
+    .modal-card { background: #1c2e45; border: 1px solid #3a5a7a; border-radius: 16px; padding: 24px; max-width: 480px; width: 100%; text-align: center; max-height: 92vh; overflow-y: auto; }
+    .modal-card h3 { margin: 0 0 10px; font-size: 22px; color: #7ae0b0; }
+    .modal-card p { color: #c5d8ec; font-size: 14px; line-height: 1.7; }
+    .modal-card .cert-preview { margin: 14px 0; border-radius: 10px; overflow: hidden; border: 1px solid #3a5a7a; }
+    .modal-card .cert-preview img { width: 100%; display: block; }
+    .modal-card .actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+    @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+    🩺 动脉血压调节 · 预测式虚拟仿真实验
+    <small>预测 → 干预 → 验证 · 六项干预</small>
+</header>
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="wrap">
+    <section class="panel">
+        <h2>🧪 实验台 · 干预操作</h2>
+
+        <div class="stage" id="stage">
+            <div class="vial-row">
+                <div>
+                    <div class="vial ach" id="vial-ach">乙酰胆碱<br>ACh</div>
+                    <div class="vial-label">ACh</div>
+                </div>
+                <div>
+                    <div class="vial na" id="vial-epi">肾上腺素<br>Adr</div>
+                    <div class="vial-label">肾上腺素</div>
+                </div>
+                <div>
+                    <div class="vial ne" id="vial-ne">去甲肾上腺素<br>NE</div>
+                    <div class="vial-label">去甲肾</div>
+                </div>
+                <div>
+                    <div class="vial saline" id="vial-saline">生理盐水<br>对照</div>
+                    <div class="vial-label">对照</div>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <!-- 家兔仰卧固定于兔台：躯干拉长，头朝上 -->
+                <svg class="rabbit-svg" id="rabbitSvg" viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="tableGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="#9c8260"/>
+                            <stop offset="1" stop-color="#6d5940"/>
+                        </linearGradient>
+                        <linearGradient id="furGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#fbf8f2"/>
+                            <stop offset="0.6" stop-color="#e8e0d2"/>
+                            <stop offset="1" stop-color="#cfc4b2"/>
+                        </linearGradient>
+                        <radialGradient id="headGrad" cx="45%" cy="38%" r="65%">
+                            <stop offset="0" stop-color="#ffffff"/>
+                            <stop offset="0.7" stop-color="#eee7db"/>
+                            <stop offset="1" stop-color="#d3c9b8"/>
+                        </radialGradient>
+                        <linearGradient id="earGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="#f3e8e2"/>
+                            <stop offset="0.55" stop-color="#e8c9c2"/>
+                            <stop offset="1" stop-color="#d9aaa2"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- 兔台 -->
+                    <rect x="16" y="24" width="328" height="154" rx="10" fill="url(#tableGrad)" stroke="#4d3f2e" stroke-width="3"/>
+                    <line x1="28" y1="40" x2="332" y2="40" stroke="#00000018" stroke-width="1"/>
+                    <line x1="28" y1="162" x2="332" y2="162" stroke="#00000018" stroke-width="1"/>
+                    <!-- 绑带 -->
+                    <rect x="16" y="38" width="328" height="7" fill="#3d3123" opacity="0.85"/>
+                    <rect x="16" y="157" width="328" height="7" fill="#3d3123" opacity="0.85"/>
+                    <g stroke="#5a4934" stroke-width="2">
+                        <line x1="24" y1="38" x2="24" y2="45"/><line x1="44" y1="38" x2="44" y2="45"/>
+                        <line x1="64" y1="38" x2="64" y2="45"/><line x1="84" y1="38" x2="84" y2="45"/>
+                        <line x1="104" y1="38" x2="104" y2="45"/><line x1="124" y1="38" x2="124" y2="45"/>
+                        <line x1="144" y1="38" x2="144" y2="45"/><line x1="164" y1="38" x2="164" y2="45"/>
+                        <line x1="184" y1="38" x2="184" y2="45"/><line x1="204" y1="38" x2="204" y2="45"/>
+                        <line x1="224" y1="38" x2="224" y2="45"/><line x1="244" y1="38" x2="244" y2="45"/>
+                        <line x1="264" y1="38" x2="264" y2="45"/><line x1="284" y1="38" x2="284" y2="45"/>
+                        <line x1="304" y1="38" x2="304" y2="45"/><line x1="324" y1="38" x2="324" y2="45"/>
+                        <line x1="24" y1="157" x2="24" y2="164"/><line x1="44" y1="157" x2="44" y2="164"/>
+                        <line x1="64" y1="157" x2="64" y2="164"/><line x1="84" y1="157" x2="84" y2="164"/>
+                        <line x1="104" y1="157" x2="104" y2="164"/><line x1="124" y1="157" x2="124" y2="164"/>
+                        <line x1="144" y1="157" x2="144" y2="164"/><line x1="164" y1="157" x2="164" y2="164"/>
+                        <line x1="184" y1="157" x2="184" y2="164"/><line x1="204" y1="157" x2="204" y2="164"/>
+                        <line x1="224" y1="157" x2="224" y2="164"/><line x1="244" y1="157" x2="244" y2="164"/>
+                        <line x1="264" y1="157" x2="264" y2="164"/><line x1="284" y1="157" x2="284" y2="164"/>
+                        <line x1="304" y1="157" x2="304" y2="164"/><line x1="324" y1="157" x2="324" y2="164"/>
+                    </g>
+
+                    <!-- 家兔：躯干拉长（垂直方向长轴），头朝上 -->
+                    <g id="rabbitGroup">
+                        <!-- 后肢（下方，张开） -->
+                        <path d="M122 148 Q102 172 90 180 Q82 184 78 178 Q74 172 84 162 Q94 152 112 142 Z"
+                              fill="url(#furGrad)" stroke="#b7ab97" stroke-width="1.5"/>
+                        <path d="M238 148 Q258 172 270 180 Q278 184 282 178 Q286 172 276 162 Q266 152 248 142 Z"
+                              fill="url(#furGrad)" stroke="#b7ab97" stroke-width="1.5"/>
+                        <ellipse cx="84" cy="176" rx="9" ry="6" fill="#e2d8c8" stroke="#b7ab97" stroke-width="1.2" transform="rotate(-20 84 176)"/>
+                        <ellipse cx="276" cy="176" rx="9" ry="6" fill="#e2d8c8" stroke="#b7ab97" stroke-width="1.2" transform="rotate(20 276 176)"/>
+
+                        <!-- 前肢（上方，张开） -->
+                        <path d="M138 92 Q116 82 104 76 Q96 72 92 80 Q88 88 100 94 Q114 100 130 104 Z"
+                              fill="url(#furGrad)" stroke="#b7ab97" stroke-width="1.5"/>
+                        <path d="M222 92 Q244 82 256 76 Q264 72 268 80 Q272 88 260 94 Q246 100 230 104 Z"
+                              fill="url(#furGrad)" stroke="#b7ab97" stroke-width="1.5"/>
+                        <ellipse cx="96" cy="78" rx="8" ry="6" fill="#e2d8c8" stroke="#b7ab97" stroke-width="1.2" transform="rotate(30 96 78)"/>
+                        <ellipse cx="264" cy="78" rx="8" ry="6" fill="#e2d8c8" stroke="#b7ab97" stroke-width="1.2" transform="rotate(-30 264 78)"/>
+
+                        <!-- 躯干：长椭圆形（垂直方向拉长），仰卧腹部 -->
+                        <ellipse cx="180" cy="128" rx="46" ry="58" fill="url(#furGrad)" stroke="#b7ab97" stroke-width="2"/>
+                        <ellipse cx="180" cy="132" rx="28" ry="38" fill="#ffffff" opacity="0.22"/>
+
+                        <!-- 双耳：摊在台面上 -->
+                        <path d="M158 64 Q132 36 118 28 Q110 24 110 34 Q110 48 130 66 Q144 76 158 72 Z"
+                              fill="url(#earGrad)" stroke="#c39a92" stroke-width="1.5"/>
+                        <path d="M202 64 Q228 36 242 28 Q250 24 250 34 Q250 48 230 66 Q216 76 202 72 Z"
+                              fill="url(#earGrad)" stroke="#c39a92" stroke-width="1.5"/>
+                        <!-- 左耳耳缘静脉 -->
+                        <path d="M152 66 Q134 46 122 34" fill="none" stroke="#b8574d" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+                        <!-- 右耳耳缘静脉（注射目标） -->
+                        <path id="earVeinPath" d="M208 66 Q226 46 238 34" fill="none" stroke="#b8574d" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+
+                        <!-- 头部 -->
+                        <ellipse cx="180" cy="74" rx="28" ry="24" fill="url(#headGrad)" stroke="#b7ab97" stroke-width="2"/>
+                        <path d="M167 70 Q171 66 175 70" fill="none" stroke="#7a6a55" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M185 70 Q189 66 193 70" fill="none" stroke="#7a6a55" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M178 81 Q180 84 182 81" fill="none" stroke="#c98a84" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="170" y1="87" x2="161" y2="89" stroke="#b7ab97" stroke-width="1" opacity="0.7"/>
+                        <line x1="190" y1="87" x2="199" y2="89" stroke="#b7ab97" stroke-width="1" opacity="0.7"/>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="vial-point" id="vialPoint"></div>
+            <div class="vein-point" id="veinPoint"></div>
+
+            <div class="syringe" id="syringe">
+                <div class="needle"></div>
+                <div class="plunger" id="plunger"></div>
+                <div class="liquid" id="liquid"></div>
+            </div>
+        </div>
+
+        <div class="muted" style="text-align:center; margin-top: 6px;">家兔已麻醉，仰卧固定于兔台 · 耳缘静脉注射示意（不涉及真实动物操作）</div>
+
+        <div style="display:flex; justify-content:center; gap:10px; margin-top:10px; flex-wrap:wrap;">
+            <div class="status-badge">❤️ 心率 <b id="hrDisplay" style="color:#ffb074">240</b> bpm</div>
+            <div class="status-badge">🩸 <b id="sbpBadge" style="color:#70d3fc">120</b> / <b id="dbpBadge" style="color:#70d3fc">80</b> mmHg</div>
+        </div>
+
+        <div class="controls">
+            <select id="intervention">
+                <option value="saline">生理盐水（对照）</option>
+                <option value="epi">肾上腺素（静脉注射）</option>
+                <option value="ach">乙酰胆碱（静脉注射）</option>
+                <option value="ne">去甲肾上腺素（静脉注射）</option>
+                <option value="clamp">夹闭一侧颈总动脉</option>
+                <option value="stretch">牵拉一侧颈总动脉</option>
+            </select>
+        </div>
+
+        <div class="predict-row" id="predictRow">
+            <div style="font-size:12px;color:#aec2da;width:100%;margin-bottom:2px;">📝 第一步：预测干预后的数值（点击输入框可修改），然后提交预测</div>
+            <div class="field">收缩压 SBP<input type="number" id="predSBP" min="20" max="250" value="120"></div>
+            <div class="field">舒张压 DBP<input type="number" id="predDBP" min="10" max="180" value="80"></div>
+            <div class="field">心率 HR<input type="number" id="predHR" min="40" max="500" value="240"></div>
+            <button id="submitPredict" class="secondary">✅ 提交预测</button>
+        </div>
+
+        <div class="controls" id="actionRow">
+            <button id="applyBtn" disabled>▶ 第二步：执行干预</button>
+            <button id="reset" class="secondary">重置实验</button>
+        </div>
+
+        <p id="status" class="muted" style="margin: 8px 0 4px;">准备就绪：先填写预测值并提交，再执行干预。</p>
+
+        <h2 style="margin-top: 16px;">📋 实验记录</h2>
+        <div class="log" id="log">
+            <div>0 s　实验开始，记录基础血压与心率。</div>
+        </div>
+
+        <div style="margin-top: 12px;">
+            <div style="font-size:12px;color:#aec2da;margin-bottom:4px;">已完成的干预：<span id="doneCount">0</span>/6</div>
+            <div class="done-list" id="doneList"></div>
+        </div>
+
+        <div class="controls" id="finishRow" style="display:none;">
+            <button id="finishBtn" class="success">🏁 结束实验 · 生成通关证明</button>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>📈 动态监护 · 模拟波形</h2>
+        <canvas id="plot"></canvas>
+        <div class="metrics">
+            <div class="metric">收缩压 SBP<strong id="sbp">120</strong>mmHg</div>
+            <div class="metric">舒张压 DBP<strong id="dbp">80</strong>mmHg</div>
+            <div class="metric">平均压 MAP<strong id="map">93</strong>mmHg</div>
+            <div class="metric hr">心率 HR<strong id="hrMetric">240</strong>bpm</div>
+        </div>
+        <p class="muted" style="margin-top: 8px;">
+            预测值提交后，点击执行干预，观察实际波形与指标。系统会对比你的预测与实际结果。
+        </p>
+        <h2 style="margin-top: 14px;">💡 思考题</h2>
+        <p style="font-size: 13px; line-height: 1.7;">
+            比较肾上腺素、去甲肾上腺素、乙酰胆碱对血压和心率的作用差异，并结合受体机制（α、β、M）分析。<br>
+            夹闭与牵拉颈总动脉分别通过何种反射途径影响血压和心率？
+        </p>
+    </section>
+</div>
+<div class="foot">
+    教学原型：波形采用示意性数学模型，非真实动物数据；药物反应未进行剂量、药代动力学及反射调节验证，不用于实验定量推断。
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal-card">
+        <h3>🎉 通关成功！</h3>
+        <p>你已完成全部 6 项干预的预测与验证。<br>以下是你的通关证明，可保存为 PNG 图片。</p>
+        <div class="cert-preview" id="certPreview"></div>
+        <div class="actions">
+            <button id="downloadCert" class="success">⬇ 下载通关证明 PNG</button>
+            <button id="closeModal" class="secondary">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const BASE_SBP = 120, BASE_DBP = 80, BASE_HR = 240;
+    const INTERVENTIONS = ['saline', 'epi', 'ach', 'ne', 'clamp', 'stretch'];
+    const LABEL = {
+        saline: '生理盐水（对照）', epi: '肾上腺素', ach: '乙酰胆碱',
+        ne: '去甲肾上腺素', clamp: '夹闭一侧颈总动脉', stretch: '牵拉一侧颈总动脉'
+    };
+    const DRUG_TYPES = ['saline', 'epi', 'ach', 'ne'];
+
+    let t = 0;
+    let events = [];
+    let history = [];
+    let timer = null;
+
+    let pendingType = null;
+    let completedTypes = new Set();
+    let executing = false;
+
+    const $ = id => document.getElementById(id);
+    const sbpEl = $('sbp'), dbpEl = $('dbp'), mapEl = $('map'), hrMetricEl = $('hrMetric');
+    const hrDisplayEl = $('hrDisplay'), sbpBadgeEl = $('sbpBadge'), dbpBadgeEl = $('dbpBadge');
+    const logEl = $('log'), statusEl = $('status');
+    const predSBP = $('predSBP'), predDBP = $('predDBP'), predHR = $('predHR');
+    const submitPredictBtn = $('submitPredict');
+    const applyBtn = $('applyBtn');
+    const interventionSel = $('intervention');
+    const progressFill = $('progressFill');
+    const doneCountEl = $('doneCount'), doneListEl = $('doneList');
+    const finishRow = $('finishRow'), finishBtn = $('finishBtn');
+    const syringeEl = $('syringe'), plungerEl = $('plunger'), liquidEl = $('liquid');
+    const vialPoint = $('vialPoint'), veinPoint = $('veinPoint');
+    const stageEl = $('stage');
+    const earVeinPath = $('earVeinPath');
+
+    // ==================== 效应模型 ====================
+    function effectFor(type, time) {
+        let dSBP = 0, dDBP = 0, dHR = 0;
+        for (const e of events) {
+            if (e.type !== type) continue;
+            const dt = time - e.t;
+            if (dt <= 0) continue;
+            if (type === 'epi') {
+                const f = 1 - Math.exp(-dt / 2.5), dec = Math.exp(-dt / 22);
+                dSBP += 52 * f * dec; dDBP += 30 * f * dec; dHR += 60 * f * dec;
+            } else if (type === 'ach') {
+                const f = 1 - Math.exp(-dt / 2.0), dec = Math.exp(-dt / 14);
+                dSBP -= 42 * f * dec; dDBP -= 32 * f * dec; dHR -= 95 * f * dec;
+            } else if (type === 'ne') {
+                const f = 1 - Math.exp(-dt / 2.2), dec = Math.exp(-dt / 20);
+                dSBP += 65 * f * dec; dDBP += 45 * f * dec; dHR -= 45 * f * dec;
+            } else if (type === 'clamp') {
+                const f = 1 - Math.exp(-dt / 1.8), dec = Math.exp(-dt / 18);
+                dSBP += 35 * f * dec; dDBP += 22 * f * dec; dHR += 40 * f * dec;
+            } else if (type === 'stretch') {
+                const f = 1 - Math.exp(-dt / 1.8), dec = Math.exp(-dt / 16);
+                dSBP -= 30 * f * dec; dDBP -= 20 * f * dec; dHR -= 55 * f * dec;
+            }
+        }
+        return { dSBP, dDBP, dHR };
+    }
+
+    function getVitals(time) {
+        let dSBP = 0, dDBP = 0, dHR = 0;
+        for (const type of INTERVENTIONS) {
+            const e = effectFor(type, time);
+            dSBP += e.dSBP; dDBP += e.dDBP; dHR += e.dHR;
+        }
+        let sbp = Math.min(220, Math.max(45, BASE_SBP + dSBP));
+        let dbp = Math.min(150, Math.max(20, BASE_DBP + dDBP));
+        if (sbp <= dbp) sbp = dbp + 15;
+        let hr = Math.min(420, Math.max(60, BASE_HR + dHR));
+        const map = dbp + (sbp - dbp) / 3;
+        return { sbp, dbp, map, hr };
+    }
+
+    // ==================== 绘图 ====================
+    const canvas = $('plot'), ctx = canvas.getContext('2d');
+
+    function paint() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0) return;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const w = rect.width, h = rect.height;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = '#071423';
+        ctx.fillRect(0, 0, w, h);
+
+        const left = 46, right = w - 10, top = 18, bottom = h - 32;
+        const pMin = 20, pMax = 220;
+
+        ctx.strokeStyle = '#29465d';
+        ctx.lineWidth = 1;
+        ctx.font = '11px Arial';
+        ctx.fillStyle = '#b5c9de';
+        for (let p = 40; p <= 200; p += 40) {
+            const y = bottom - ((p - pMin) / (pMax - pMin)) * (bottom - top);
+            ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+            ctx.fillText(p, left - 30, y + 3);
+        }
+
+        const span = 120;
+        const start = Math.max(0, t - span);
+        const x = v => left + ((v - start) / span) * (right - left);
+        const y = v => bottom - ((v - pMin) / (pMax - pMin)) * (bottom - top);
+        for (let i = 0; i <= 4; i++) {
+            const s = start + i * 30;
+            ctx.fillText(Math.round(s) + 's', x(s) - 7, h - 10);
+        }
+
+        ctx.strokeStyle = '#50e2a0';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        let first = true;
+        for (const pt of history) {
+            if (pt.t < start) continue;
+            const px = x(pt.t), py = y(pt.p);
+            if (first) { ctx.moveTo(px, py); first = false; }
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        const labelMap = { saline: '盐水', epi: 'Adr', ach: 'ACh', ne: 'NE', clamp: '夹闭', stretch: '牵拉' };
+        for (const e of events) {
+            if (e.t < start) continue;
+            ctx.strokeStyle = '#f8b453';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x(e.t), top);
+            ctx.lineTo(x(e.t), bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#f8b453';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText(labelMap[e.type] || e.type, x(e.t) + 2, top + 11);
+        }
+
+        const v = getVitals(t);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillStyle = '#ffb074';
+        ctx.fillText(`❤️ ${Math.round(v.hr)} bpm`, right - 100, top + 18);
+    }
+
+    function updateMetrics() {
+        const v = getVitals(t);
+        sbpEl.textContent = Math.round(v.sbp);
+        dbpEl.textContent = Math.round(v.dbp);
+        mapEl.textContent = Math.round(v.map);
+        hrMetricEl.textContent = Math.round(v.hr);
+        hrDisplayEl.textContent = Math.round(v.hr);
+        sbpBadgeEl.textContent = Math.round(v.sbp);
+        dbpBadgeEl.textContent = Math.round(v.dbp);
+    }
+
+    function tick() {
+        t += 0.06;
+        const v = getVitals(t);
+        const pulseFreq = v.hr / 60;
+        const pulse = (v.sbp - v.dbp) * (0.5 + 0.5 * Math.sin(t * 2 * Math.PI * pulseFreq));
+        const instantP = v.dbp + pulse;
+        history.push({ t, p: instantP });
+        if (history.length > 18000) history.shift();
+        updateMetrics();
+        paint();
+    }
+
+    function startTimer() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(tick, 30);
+    }
+
+    function addLog(msg, cls) {
+        const d = document.createElement('div');
+        if (cls) d.className = cls;
+        d.textContent = msg;
+        logEl.appendChild(d);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateProgress() {
+        const done = completedTypes.size;
+        doneCountEl.textContent = done;
+        progressFill.style.width = (done / 6 * 100) + '%';
+        doneListEl.innerHTML = '';
+        for (const type of INTERVENTIONS) {
+            const chip = document.createElement('span');
+            chip.className = 'done-chip' + (completedTypes.has(type) ? ' done' : '');
+            chip.textContent = LABEL[type] + (completedTypes.has(type) ? ' ✓' : '');
+            doneListEl.appendChild(chip);
+        }
+        finishRow.style.display = (done === 6) ? 'flex' : 'none';
+    }
+
+    // ==================== 坐标计算 ====================
+    function stageRect() { return stageEl.getBoundingClientRect(); }
+
+    function getVialCapPos(type) {
+        const vial = $('vial-' + type);
+        const sr = stageRect();
+        if (!vial) return { x: sr.width / 2, y: 60 };
+        const vRect = vial.getBoundingClientRect();
+        return {
+            x: vRect.left - sr.left + vRect.width / 2,
+            y: vRect.top - sr.top - 8
+        };
+    }
+
+    // 耳缘静脉注射点：取 SVG 路径中点
+    function getVeinPos() {
+        const sr = stageRect();
+        const pathRect = earVeinPath.getBoundingClientRect();
+        return {
+            x: pathRect.left - sr.left + pathRect.width * 0.6,
+            y: pathRect.top - sr.top + pathRect.height * 0.55
+        };
+    }
+
+    // ===== 关键修正：针尖坐标反推针筒位置 =====
+    // 针尖相对针筒原点（transform-origin）的偏移量：
+    // 针尖在元素局部坐标中 = (-46 - 8 + 5, 12) ≈ (-49, 12)
+    // 旋转角 θ（度）后，针尖世界偏移 = (ox*cosθ - oy*sinθ, ox*sinθ + oy*cosθ)
+    // 我们希望针尖落在 (tx, ty)，所以针筒原点位置 = 目标 - 旋转后的偏移
+    const NEEDLE_OFFSET_X = -49;   // 针尖相对原点的局部 x
+    const NEEDLE_OFFSET_Y = 0;     // 针尖在垂直中央，相对原点 y=0
+
+    function setNeedleAt(targetX, targetY, rotationDeg, opacity) {
+        const rad = rotationDeg * Math.PI / 180;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        const offX = NEEDLE_OFFSET_X * cos - NEEDLE_OFFSET_Y * sin;
+        const offY = NEEDLE_OFFSET_X * sin + NEEDLE_OFFSET_Y * cos;
+        const originX = targetX - offX;
+        const originY = targetY - offY;
+        syringeEl.style.left = originX + 'px';
+        syringeEl.style.top = (originY - 12) + 'px';
+        syringeEl.style.transform = 'rotate(' + rotationDeg + 'deg)';
+        if (opacity !== undefined) syringeEl.style.opacity = opacity;
+    }
+
+    function showPoint(el, x, y) {
+        el.style.left = (x - 6) + 'px';
+        el.style.top = (y - 6) + 'px';
+        el.classList.add('show');
+    }
+    function hidePoint(el) { el.classList.remove('show'); }
+
+    // ==================== 注射器动画（放慢版） ====================
+    function playSyringeAnimation(drugType, onInject, onDone) {
+        if (DRUG_TYPES.indexOf(drugType) === -1) {
+            if (onInject) onInject();
+            if (onDone) setTimeout(onDone, 500);
+            return;
+        }
+
+        const vialCap = getVialCapPos(drugType);
+        const vein = getVeinPos();
+
+        // 初始隐藏
+        syringeEl.style.transition = 'none';
+        syringeEl.style.opacity = '0';
+        setNeedleAt(vialCap.x + 80, vialCap.y - 30, -20, 0);
+        plungerEl.style.transition = 'none';
+        plungerEl.style.left = '4px';
+        liquidEl.style.transition = 'none';
+        liquidEl.style.width = '0px';
+        void syringeEl.offsetWidth;
+
+        // 全程过渡：0.9s 移动，吸药 0.9s
+        syringeEl.style.transition = 'left .9s cubic-bezier(.4,.05,.3,1), top .9s cubic-bezier(.4,.05,.3,1), opacity .4s, transform .9s cubic-bezier(.4,.05,.3,1)';
+        plungerEl.style.transition = 'left .9s ease';
+        liquidEl.style.transition = 'width .9s ease';
+
+        // ① 0.1s：出现在药瓶右上方
+        setTimeout(() => {
+            syringeEl.style.opacity = '1';
+            setNeedleAt(vialCap.x + 50, vialCap.y - 50, -25, 1);
+        }, 100);
+
+        // ② 1.0s：针尖移动到药瓶盖正上方
+        setTimeout(() => {
+            setNeedleAt(vialCap.x, vialCap.y - 30, -60, 1);
+        }, 1000);
+
+        // ③ 1.9s：针尖刺入瓶盖（针尖正好落在瓶盖位置）
+        setTimeout(() => {
+            setNeedleAt(vialCap.x, vialCap.y, -75, 1);
+            showPoint(vialPoint, vialCap.x, vialCap.y);
+        }, 1900);
+
+        // ④ 2.4s：开始吸药（活塞拉出，药液充满）—— 吸药持续 1.2s
+        setTimeout(() => {
+            plungerEl.style.left = '44px';
+            liquidEl.style.width = '52px';
+        }, 2400);
+
+        // ⑤ 4.2s：吸药完成，针头拔出药瓶，上移到药瓶上方
+        setTimeout(() => {
+            hidePoint(vialPoint);
+            setNeedleAt(vialCap.x + 30, vialCap.y - 90, -30, 1);
+        }, 4200);
+
+        // ⑥ 5.2s：移动到耳缘静脉上方（先到上方偏高位置，准备刺入）
+        setTimeout(() => {
+            setNeedleAt(vein.x + 50, vein.y - 70, -15, 1);
+        }, 5200);
+
+        // ⑦ 6.2s：针尖精确刺入耳缘静脉（针尖落在静脉上，角度 -15°）
+        setTimeout(() => {
+            setNeedleAt(vein.x, vein.y, -18, 1);
+            showPoint(veinPoint, vein.x, vein.y);
+            if (onInject) onInject();
+        }, 6200);
+
+        // ⑧ 6.8s：推注（活塞推入，药液减少），持续 1.2s
+        setTimeout(() => {
+            plungerEl.style.left = '4px';
+            liquidEl.style.width = '0px';
+        }, 6800);
+
+        // ⑨ 8.6s：推注完成，针头拔出静脉
+        setTimeout(() => {
+            hidePoint(veinPoint);
+            setNeedleAt(vein.x + 50, vein.y - 90, -30, 1);
+        }, 8600);
+
+        // ⑩ 9.6s：注射器移开并淡出
+        setTimeout(() => {
+            syringeEl.style.opacity = '0';
+        }, 9600);
+
+        setTimeout(() => {
+            if (onDone) onDone();
+        }, 10200);
+    }
+
+    // ==================== 预测 ====================
+    function refreshPredictInputs() {
+        const v = getVitals(t);
+        predSBP.value = Math.round(v.sbp);
+        predDBP.value = Math.round(v.dbp);
+        predHR.value = Math.round(v.hr);
+    }
+
+    function lockPredictInputs(lock) {
+        predSBP.disabled = lock;
+        predDBP.disabled = lock;
+        predHR.disabled = lock;
+        interventionSel.disabled = lock;
+        submitPredictBtn.disabled = lock;
+    }
+
+    function onInterventionChange() {
+        if (executing) return;
+        pendingType = null;
+        applyBtn.disabled = true;
+        lockPredictInputs(false);
+        statusEl.textContent = '已选择：' + LABEL[interventionSel.value] + '。请填写预测值后提交。';
+        refreshPredictInputs();
+    }
+
+    submitPredictBtn.onclick = function() {
+        if (executing) return;
+        const type = interventionSel.value;
+        const pSBP = parseFloat(predSBP.value);
+        const pDBP = parseFloat(predDBP.value);
+        const pHR = parseFloat(predHR.value);
+        if ([pSBP, pDBP, pHR].some(v => isNaN(v) || v <= 0)) {
+            statusEl.textContent = '⚠️ 请填写有效的预测值（三个数都必须大于 0）。';
+            return;
+        }
+        pendingType = type;
+        applyBtn.disabled = false;
+        lockPredictInputs(true);
+        addLog(`${t.toFixed(1)} s　📝 提交预测（${LABEL[type]}）：SBP ${Math.round(pSBP)} / DBP ${Math.round(pDBP)} / HR ${Math.round(pHR)}`);
+        statusEl.textContent = '✅ 预测已提交。点击"执行干预"开始实验。';
+    };
+
+    // ==================== 判定 ====================
+    function judgePrediction(type, prediction, actual) {
+        const dSBP = Math.abs(prediction.sbp - actual.sbp);
+        const dDBP = Math.abs(prediction.dbp - actual.dbp);
+        const dHR = Math.abs(prediction.hr - actual.hr);
+        const sbpOK = dSBP <= 10, dbpOK = dDBP <= 8, hrOK = dHR <= 20;
+        const okCount = (sbpOK ? 1 : 0) + (dbpOK ? 1 : 0) + (hrOK ? 1 : 0);
+
+        let level, cls;
+        if (okCount === 3) { level = '🎯 预测准确，非常棒！'; cls = 'judge-ok'; }
+        else if (okCount === 2) { level = '👍 基本正确，部分偏差。'; cls = 'judge-ok'; }
+        else if (okCount === 1) { level = '🤔 偏差较大，建议回顾机制。'; cls = 'judge-bad'; }
+        else { level = '❌ 预测与结果差异明显，建议重新思考。'; cls = 'judge-bad'; }
+
+        addLog(`　实际结果：SBP ${Math.round(actual.sbp)} / DBP ${Math.round(actual.dbp)} / HR ${Math.round(actual.hr)}`, cls);
+        addLog(`　${level}（SBP误差${Math.round(dSBP)}，DBP误差${Math.round(dDBP)}，HR误差${Math.round(dHR)}）`, cls);
+        statusEl.textContent = level;
+    }
+
+    // ==================== 执行 ====================
+    applyBtn.onclick = function() {
+        if (!pendingType || executing) return;
+        const type = pendingType;
+        executing = true;
+        applyBtn.disabled = true;
+
+        const prediction = {
+            sbp: parseFloat(predSBP.value),
+            dbp: parseFloat(predDBP.value),
+            hr: parseFloat(predHR.value)
+        };
+
+        addLog(`${t.toFixed(1)} s　▶ 执行干预：${LABEL[type]}`);
+
+        playSyringeAnimation(type,
+            function onInject() {
+                events.push({ t, type });
+                addLog(`${t.toFixed(1)} s　💉 干预生效（药物进入体内）`);
+            },
+            function onDone() {
+                setTimeout(() => {
+                    const actual = getVitals(t);
+                    judgePrediction(type, prediction, actual);
+
+                    completedTypes.add(type);
+                    updateProgress();
+
+                    executing = false;
+                    pendingType = null;
+                    lockPredictInputs(false);
+                    interventionSel.value = getNextIntervention();
+                    refreshPredictInputs();
+                    onInterventionChange();
+
+                    if (completedTypes.size === 6) {
+                        statusEl.textContent = '🏁 全部干预已完成！点击下方"结束实验"生成通关证明。';
+                    }
+                }, 800);
+            }
+        );
+    };
+
+    function getNextIntervention() {
+        for (const type of INTERVENTIONS) {
+            if (!completedTypes.has(type)) return type;
+        }
+        return interventionSel.value;
+    }
+
+    // ==================== 重置 ====================
+    function resetExperiment() {
+        if (timer) clearInterval(timer);
+        t = 0;
+        events = [];
+        history = [];
+        pendingType = null;
+        completedTypes.clear();
+        executing = false;
+
+        logEl.innerHTML = '<div>0 s　实验开始，记录基础血压与心率。</div>';
+        statusEl.textContent = '准备就绪：先填写预测值并提交，再执行干预。';
+        interventionSel.disabled = false;
+        interventionSel.value = 'saline';
+        applyBtn.disabled = true;
+        lockPredictInputs(false);
+        syringeEl.style.opacity = '0';
+        hidePoint(vialPoint);
+        hidePoint(veinPoint);
+
+        updateProgress();
+        updateMetrics();
+        refreshPredictInputs();
+        paint();
+        startTimer();
+    }
+
+    // ==================== 证书 ====================
+    let certDataURL = '';
+
+    function generateCertificate() {
+        const cvs = document.createElement('canvas');
+        cvs.width = 900;
+        cvs.height = 620;
+        const c = cvs.getContext('2d');
+
+        const grad = c.createLinearGradient(0, 0, 900, 620);
+        grad.addColorStop(0, '#0e2038');
+        grad.addColorStop(1, '#173a55');
+        c.fillStyle = grad;
+        c.fillRect(0, 0, 900, 620);
+
+        c.strokeStyle = '#50e2a0';
+        c.lineWidth = 6;
+        c.strokeRect(24, 24, 852, 572);
+        c.strokeStyle = '#3786e5';
+        c.lineWidth = 2;
+        c.strokeRect(40, 40, 820, 540);
+
+        c.fillStyle = '#70d3fc';
+        c.font = 'bold 24px "Microsoft YaHei", Arial, sans-serif';
+        c.textAlign = 'center';
+        c.fillText('🏆  通关证明  🏆', 450, 105);
+
+        c.font = '16px "Microsoft YaHei", Arial, sans-serif';
+        c.fillStyle = '#aec9e6';
+        c.fillText('CERTIFICATE OF COMPLETION', 450, 140);
+
+        c.fillStyle = '#eaf2ff';
+        c.font = '18px "Microsoft YaHei", Arial, sans-serif';
+        c.fillText('兹证明', 450, 210);
+
+        c.font = 'bold 34px "Microsoft YaHei", Arial, sans-serif';
+        c.fillStyle = '#50e2a0';
+        c.fillText('虚拟实验学员', 450, 270);
+
+        c.fillStyle = '#eaf2ff';
+        c.font = '17px "Microsoft YaHei", Arial, sans-serif';
+        c.fillText('已完成「动脉血压调节 · 预测式虚拟仿真实验」全部 6 项干预：', 450, 330);
+
+        c.font = '15px "Microsoft YaHei", Arial, sans-serif';
+        c.fillStyle = '#bfd9f5';
+        c.fillText('生理盐水对照 · 肾上腺素 · 乙酰胆碱 · 去甲肾上腺素', 450, 375);
+        c.fillText('夹闭一侧颈总动脉 · 牵拉一侧颈总动脉', 450, 405);
+
+        const now = new Date();
+        const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+        c.fillStyle = '#aec9e6';
+        c.font = '15px "Microsoft YaHei", Arial, sans-serif';
+        c.textAlign = 'right';
+        c.fillText('发证日期：' + dateStr, 800, 510);
+
+        c.beginPath();
+        c.arc(210, 500, 52, 0, Math.PI * 2);
+        c.strokeStyle = '#50e2a0';
+        c.lineWidth = 3;
+        c.stroke();
+        c.fillStyle = '#50e2a0';
+        c.font = 'bold 15px "Microsoft YaHei", Arial, sans-serif';
+        c.textAlign = 'center';
+        c.fillText('虚拟仿真', 210, 496);
+        c.fillText('教学中心', 210, 516);
+
+        c.fillStyle = '#0a1826';
+        c.fillRect(60, 545, 780, 30);
+        c.fillStyle = '#7a9cbf';
+        c.font = '12px Arial, sans-serif';
+        c.fillText('动脉血压调节 · 预测式虚拟仿真实验 · 教学原型', 450, 566);
+
+        return cvs.toDataURL('image/png');
+    }
+
+    finishBtn.onclick = function() {
+        certDataURL = generateCertificate();
+        const preview = $('certPreview');
+        preview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = certDataURL;
+        img.alt = '通关证明';
+        preview.appendChild(img);
+        $('modal').classList.add('show');
+    };
+
+    $('downloadCert').onclick = function() {
+        if (!certDataURL) return;
+        const a = document.createElement('a');
+        a.href = certDataURL;
+        const d = new Date();
+        const name = '动脉血压调节通关证明_' + d.getFullYear() + (d.getMonth()+1) + d.getDate() + '.png';
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    $('closeModal').onclick = function() {
+        $('modal').classList.remove('show');
+    };
+
+    // ==================== 初始化 ====================
+    function init() {
+        interventionSel.addEventListener('change', onInterventionChange);
+        $('reset').onclick = resetExperiment;
+        window.addEventListener('resize', () => paint());
+
+        updateMetrics();
+        updateProgress();
+        refreshPredictInputs();
+        onInterventionChange();
+        paint();
+        startTimer();
+    }
+
+    init();
+})();
+</script>
+</body>
+</html>
